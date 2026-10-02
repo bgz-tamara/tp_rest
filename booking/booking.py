@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, make_response
-import requests
+#import requests
 import json
 from werkzeug.exceptions import NotFound
 
@@ -19,16 +19,16 @@ def write(bookings):
 
 def movie_is_scheduled(date, movieId) :
    try:
-      r = request.get('https://localhost:3201/schedule/{date}');
+      r = request.get('https://localhost:3201/schedule/{date}')
    except request.exceptions.RequestException:
       return None
-   if r.status_code !== 200
-      return false;
-   else 
-      for entry in r.json()["schedule"]:
-         if entry["date"] == date:
-            return movie_id in entry["movies"]
-         return False
+   if r.status_code != 200 :
+      return False
+   else :
+        for entry in r.json()["schedule"]:
+            if entry["movies"] == movie_id:
+                return True
+        return False
 
 # root message
 @app.route("/", methods=['GET'])
