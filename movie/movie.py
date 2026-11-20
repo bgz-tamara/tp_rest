@@ -18,6 +18,23 @@ def write(movies):
         full['movies']=movies
         json.dump(full, f)
 
+def check_admin(userid):
+    try:
+        res = requests.get(USER_SERVICE + "/users/" + userid + "/admin")
+
+        if res.status_code != 200:
+            return False, make_response(jsonify({"error":"User not found"}),404)
+
+        user = res.json()
+
+        if user["admin"] == True:
+            return True, None
+
+        return False, make_response(jsonify({"error":"Admin permission required"}),403)
+
+    except requests.exceptions.RequestException:
+        return False, make_response(jsonify({"error":"User service unavailable"}),503)
+
 # root message
 @app.route("/", methods=['GET'])
 def home():
@@ -55,8 +72,13 @@ def get_movie_bytitle(): # pas très Rest rules car parametre caché dans la req
     return res
 
 # modif de la note d'un film existant 
-@app.route("/movies/<movieid>/<rate>", methods=['PUT'])
-def update_movie_rating(movieid, rate):
+@app.route("/movies/<movieid>/<rate>/<userid>", methods=['PUT'])
+def update_movie_rating(movieid, rate, userid):
+    is_admin, error = check_admin(userid)
+
+    if not is_admin:
+        return error
+
     for movie in movies:
         if str(movie["id"]) == str(movieid):
             movie["rating"] = rate
@@ -68,8 +90,13 @@ def update_movie_rating(movieid, rate):
     return res
 
 # delete un film 
-@app.route("/movies/<movieid>", methods=['DELETE'])
-def del_movie(movieid):
+@app.route("/movies/<movieid>/<userid>", methods=['DELETE'])
+def del_movie(movieid, userid):
+    is_admin, error = check_admin(userid)
+
+    if not is_admin:
+        return error
+
     for movie in movies:
         if str(movie["id"]) == str(movieid):
             movies.remove(movie)
@@ -80,8 +107,13 @@ def del_movie(movieid):
     return res
 
 # ajout d'un film
-@app.route("/movies/<movieid>", methods=['POST'])
-def add_movie(movieid):
+@app.route("/movies/<movieid>/<userid>", methods=['POST'])
+def add_movie(movieid, userid):
+    is_admin, error = check_admin(userid)
+
+    if not is_admin:
+        return error
+
     req = request.get_json()
 
     for movie in movies:
