@@ -58,7 +58,17 @@ def get_schedule_by_date_and_movie(date, movieid):
             return make_response(jsonify({"error": "Movie is not scheduled at this date"}), 404)
     return make_response(jsonify({"error":"Schedule not found"}),404) 
 
-
+@app.route("/schedules/<movieid>", methods=['GET'])
+def get_schedules_by_movie(movieid): 
+    date_tab = []
+    for schedule in schedules:     
+        if str(movieid) in schedule["movies"]:  
+            date_tab.append(schedule["date"])
+    
+    if len(date_tab)==0:
+        return make_response(jsonify({"error":"No schedule found for this movie"}),404) 
+    return make_response(jsonify({"movie": movieid, "dates": date_tab}), 200)
+    
 # delete un booking 
 @app.route("/schedules/<date>/<movieid>", methods=['DELETE'])
 def del_schedule(date,movieid):
