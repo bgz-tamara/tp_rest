@@ -5,7 +5,7 @@ from werkzeug.exceptions import NotFound
 
 app = Flask(__name__) # "app .run" app = serveur flask => serveur web (capable de recevoir des requetes et d'envoyerdes rep http)
 
-PORT = 3200 #choisi comme ca
+PORT = 3200 
 HOST = '0.0.0.0' 
 
 with open('{}/databases/movies.json'.format("."), 'r') as jsf:
