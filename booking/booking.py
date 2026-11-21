@@ -68,7 +68,7 @@ def get_booking(userid, date, movie):
                 if str(dates["date"]) == str(date):
                     if str(movie) in dates["movies"]:
                         add_movie_detail_to_tab_movies(movie, detail_movie)
-                    return make_response(jsonify({"date": dates["date"], "movies": detail_movie}), 200)
+                    return make_response(jsonify({"date": dates["date"], "movie": detail_movie}), 200)
         
     return make_response(jsonify({"error":"Booking not found"}),404) 
 

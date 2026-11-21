@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, make_response
 import json
+import requests
 from werkzeug.exceptions import NotFound
 
 app = Flask(__name__)
@@ -17,6 +18,24 @@ def write(schedule):
         full['schedule']=schedules               
         json.dump(full, f)
 
+
+def add_movie_detail_to_tab_movies(movieid, tab_movies_details) :
+    try:
+        r = requests.get(f"{MOVIE_URL}/movies/{movieid}")
+    except requests.exceptions.RequestException:
+        return make_response(jsonify({"error": "Movie service is not available"}), 503)
+    if r.status_code == 200:
+        tab_movies_details.append(r.json())
+    else:
+        tab_movies_details.append({"id": movieid})
+    
+def movie_is_existing(movieid):
+    try:
+        r = requests.get(f'{MOVIE_URL}/movies/{movieid}')
+    except requests.exceptions.ConnectionError:
+        return None
+    return r.status_code == 200
+        
 # root message
 @app.route("/", methods=['GET'])
 def home():
@@ -28,60 +47,54 @@ def get_json():
     res = make_response(jsonify(schedules), 200) # serialisation en json de objet python "schedules" pour envoie a l'utilisateur 
     return res
 
-# root message : recup d'un booking en json
-# @app.route("/schedules/<scheduleid>", methods=['GET'])
-# def get_schedule_byid(scheduleid): # flask se charge de parser l'url et de recup le parametre du meme nom
-#     for schedule in schedules: # schedule --> liste des horaires a partir du fichier json
-#         if str(schedule["id"]) == str(scheduleid): # verifie correspondance
-#             res = make_response(jsonify(schedule),200)
-#             return res
-#     return make_response(jsonify({"error":"Schedule ID not found"}),404) # reponse si n'existe pas 
-
 @app.route("/schedules/<date>/<movieid>", methods=['GET'])
 def get_schedule_by_date_and_movie(date, movieid): 
-    for schedule in schedules: 
-        if str(schedule["date"]) == str(date): 
+    detail_movie = []
+    for schedule in schedules:       
+        if str(schedule["date"]) == str(date):
             if str(movieid) in schedule["movies"]:
-                return make_response(jsonify(schedule),200)
+                add_movie_detail_to_tab_movies(movieid, detail_movie)
+                return make_response(jsonify({"date": schedule["date"], "movie": detail_movie}), 200)
             return make_response(jsonify({"error": "Movie is not scheduled at this date"}), 404)
     return make_response(jsonify({"error":"Schedule not found"}),404) 
 
 
 # delete un booking 
-@app.route("/schedules/<scheduleid>", methods=['DELETE'])
-def del_schedule(scheduleid):
+@app.route("/schedules/<date>/<movieid>", methods=['DELETE'])
+def del_schedule(date,movieid):
     for schedule in schedules:
-        if str(schedule["id"]) == str(scheduleid):
-            schedules.remove(schedule)
-            write(schedules)
-            return make_response(jsonify(schedule),200)
+        if str(schedule["date"]) == str(date):
+            if str(movieid) in schedule["movies"]:
+                schedule["movies"].remove(str(movieid))
+                if len(schedule["movies"]) == 0 :
+                    schedules.remove(schedule)
+                write(schedules)
+                return make_response(jsonify(schedule),200)
 
     res = make_response(jsonify({"error":"Schedule ID not found"}),500)
     return res
 
 # ajout d'un booking
-@app.route("/schedules/<scheduleid>", methods=['POST'])
-def add_schedule(scheduleid):
+@app.route("/schedules/create", methods=['POST'])
+def add_schedule():
     req = request.get_json()
     
+    movie_exists = movie_is_existing(req["movie"])
+    if movie_exists == None:
+        return make_response(jsonify({"error": "Service de film ne tourne pas"}), 503)
+    if not movie_exists :
+        return make_response(jsonify({"error": "Movie avec l'id : {} n'a pas été trouvé".format(req["movie"])}), 404)
+    
     for schedule in schedules:
-        if str(schedule["id"]) == str(scheduleid):
-            print(schedule["id"])
-            print(scheduleid)
-            return make_response(jsonify({"error":"Schedule ID already exists"}),500)
-
-    for movieid in req["movies"]: # verif movies existent
-        try:
-            r = requests.get("{}/movies/{}".format(MOVIE_URL, movieid))
-        except requests.exceptions.ConnectionError:
-            return make_response(jsonify({"error": "Service de film ne tourne pas"}), 503)
-        if r.status_code == 404:
-            return make_response(jsonify({"error": "Movie avec l'id : {} n'a pas été trouvé".format(movieid)}), 404)
-        
-    schedules.append(req)
+        if str(schedule["date"]) == str(req["date"]):
+            if str(req["movie"]) in schedule["movies"]:
+                return make_response(jsonify({"error":"Schedule already exists"}),500)
+            schedule["movies"].append(req["movie"])
+            write(schedules)
+            return make_response(jsonify({"message":"Schedule added"}),200)
+    schedules.append({"date": req["date"], "movies": [req["movie"]]})
     write(schedules)
-    res = make_response(jsonify({"message":"Schedule added"}),200)
-    return res
+    return make_response(jsonify({"message":"Schedule added"}),200)
 
 
 if __name__ == "__main__":
