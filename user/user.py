@@ -29,6 +29,10 @@ def write(users):
         full['users']=users
         json.dump(full, f)
 
+def check_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
+
 @app.route("/", methods=['GET'])
 def home():
    return "<h1 style='color:blue'>Welcome to the User service!</h1>"
@@ -95,7 +99,13 @@ def get_user_byusername(): # pas très Rest rules car parametre caché dans la r
 
 # modif le nom d'un user existant 
 @app.route("/users/<userid>/<newusername>", methods=['PUT'])
+@jwt_required()
 def update_user_username(userid, newusername):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+        
     for user in users:
         if str(user["id"]) == str(userid):
             user["name"] = newusername
@@ -108,7 +118,13 @@ def update_user_username(userid, newusername):
 
 # delete un film 
 @app.route("/users/<userid>", methods=['DELETE'])
+@jwt_required()
 def del_user(userid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+
     for user in users:
         if str(user["id"]) == str(userid):
             users.remove(user)
@@ -120,7 +136,13 @@ def del_user(userid):
 
 # ajout d'un user
 @app.route("/users/<userid>", methods=['POST'])
+@jwt_required()
 def add_user(userid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+
     req = request.get_json()
 
     for user in users:

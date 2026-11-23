@@ -5,6 +5,12 @@ from werkzeug.exceptions import NotFound
 
 app = Flask(__name__)
 
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-change-this"
+)
+
+jwt = JWTManager(app)
+
 PORT = 3201
 HOST = '0.0.0.0'
 MOVIE_URL = 'http://localhost:3200'
@@ -19,6 +25,10 @@ def write(bookings):
         full = {}
         full['bookings']=bookings
         json.dump(full, f)
+
+def check_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
 
 def movie_is_scheduled(date, movieid) :
    try:
@@ -47,7 +57,13 @@ def get_json():
     return res
 
 @app.route("/bookings/<userid>", methods=['GET'])
+@jwt_required()
 def get_all_booking_of_userid(userid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+        
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             res = []                                  
@@ -60,7 +76,13 @@ def get_all_booking_of_userid(userid):
     return make_response(jsonify({"error": "No bookings for this user founded"}), 404)
 
 @app.route("/bookings/<userid>/<date>/<movie>", methods=['GET'])
+@jwt_required()
 def get_booking(userid, date, movie): 
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             detail_movie = []          
@@ -73,7 +95,13 @@ def get_booking(userid, date, movie):
     return make_response(jsonify({"error":"Booking not found"}),404) 
 
 @app.route("/bookings/<userid>/<date>/<movieid>", methods=['DELETE'])
+@jwt_required()
 def del_booking(userid,date,movieid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             for dates in booking["dates"]: 
@@ -91,7 +119,13 @@ def del_booking(userid,date,movieid):
     return res
 
 @app.route("/bookings/create", methods=['POST'])
+@jwt_required()
 def add_booking():
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+
     req = request.get_json()
     
     scheduled = movie_is_scheduled(req["date"], req["movie"])
