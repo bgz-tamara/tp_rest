@@ -1,11 +1,20 @@
 from flask import Flask, request, jsonify, make_response
+import requests
 import json
 import sys
+import os
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 app = Flask(__name__) # "app .run" app = serveur flask => serveur web (capable de recevoir des requetes et d'envoyerdes rep http)
 
-PORT = 3200 
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-change-this"
+)
+
+jwt = JWTManager(app)
+
+PORT = 3200 #choisi comme ca
 HOST = '0.0.0.0' 
 
 with open('{}/databases/movies.json'.format("."), 'r') as jsf:
@@ -17,6 +26,10 @@ def write(movies):
         full = {}
         full['movies']=movies
         json.dump(full, f)
+
+def check_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
 
 # root message
 @app.route("/", methods=['GET'])
@@ -54,12 +67,20 @@ def get_movie_bytitle(): # pas très Rest rules car parametre caché dans la req
         res = make_response(jsonify(json),200)
     return res
 
-# modif de la note d'un film existant 
-@app.route("/movies/<movieid>/<rate>", methods=['PUT'])
-def update_movie_rating(movieid, rate):
+# modif le nom d'un film existant 
+@app.route("/movies/name_update/<movieid>", methods=['PATCH'])
+@jwt_required()
+def update_movie_name(movieid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+
+    req = request.get_json()
+
     for movie in movies:
         if str(movie["id"]) == str(movieid):
-            movie["rating"] = rate
+            movie["title"] = req["title"]
             res = make_response(jsonify(movie),200)
             write(movies)
             return res
@@ -69,7 +90,13 @@ def update_movie_rating(movieid, rate):
 
 # delete un film 
 @app.route("/movies/<movieid>", methods=['DELETE'])
+@jwt_required()
 def del_movie(movieid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+    
     for movie in movies:
         if str(movie["id"]) == str(movieid):
             movies.remove(movie)
@@ -81,7 +108,13 @@ def del_movie(movieid):
 
 # ajout d'un film
 @app.route("/movies/<movieid>", methods=['POST'])
+@jwt_required()
 def add_movie(movieid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+    
     req = request.get_json()
 
     for movie in movies:

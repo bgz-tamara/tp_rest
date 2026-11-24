@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, make_response
 import json
 import requests
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+import os
 
 app = Flask(__name__)
 
@@ -24,6 +26,9 @@ def write(schedule):
         full['schedule']=schedules               
         json.dump(full, f)
 
+def check_admin():
+    claims = get_jwt()
+    return claims.get("admin", False)
 
 def add_movie_detail_to_tab_movies(movieid, tab_movies_details) :
     try:
@@ -77,7 +82,13 @@ def get_schedules_by_movie(movieid):
     
 # delete un booking 
 @app.route("/schedules/<date>/<movieid>", methods=['DELETE'])
+@jwt_required()
 def del_schedule(date,movieid):
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+
     for schedule in schedules:
         if str(schedule["date"]) == str(date):
             if str(movieid) in schedule["movies"]:
@@ -92,7 +103,13 @@ def del_schedule(date,movieid):
 
 # ajout d'un booking
 @app.route("/schedules/create", methods=['POST'])
+@jwt_required()
 def add_schedule():
+    if not check_admin():
+        return make_response(jsonify({
+            "error": "Admin permission required"
+        }), 403)
+        
     req = request.get_json()
     
     movie_exists = movie_is_existing(req["movie"])
