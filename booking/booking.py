@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, make_response
 import requests
 import json
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt, get_jwt_identity
+import os
 
 app = Flask(__name__)
 
@@ -26,9 +28,11 @@ def write(bookings):
         full['bookings']=bookings
         json.dump(full, f)
 
-def check_admin():
+def check_permission(userid):
+    current_user = get_jwt_identity()
     claims = get_jwt()
-    return claims.get("admin", False)
+
+    return current_user == userid or claims.get("admin", False)
 
 def movie_is_scheduled(date, movieid) :
    try:
@@ -59,7 +63,7 @@ def get_json():
 @app.route("/bookings/<userid>", methods=['GET'])
 @jwt_required()
 def get_all_booking_of_userid(userid):
-    if not check_admin():
+    if not check_permission(userid):
         return make_response(jsonify({
             "error": "Missing permission"
         }), 403)
@@ -78,7 +82,7 @@ def get_all_booking_of_userid(userid):
 @app.route("/bookings/<userid>/<date>/<movie>", methods=['GET'])
 @jwt_required()
 def get_booking(userid, date, movie): 
-    if not check_admin():
+    if not check_permission(userid):
         return make_response(jsonify({
             "error": "Missing permission"
         }), 403)
@@ -97,7 +101,7 @@ def get_booking(userid, date, movie):
 @app.route("/bookings/<userid>/<date>/<movieid>", methods=['DELETE'])
 @jwt_required()
 def del_booking(userid,date,movieid):
-    if not check_admin():
+    if not check_permission(userid):
         return make_response(jsonify({
             "error": "Missing permission"
         }), 403)
@@ -119,13 +123,7 @@ def del_booking(userid,date,movieid):
     return res
 
 @app.route("/bookings/create", methods=['POST'])
-@jwt_required()
 def add_booking():
-    if not check_admin():
-        return make_response(jsonify({
-            "error": "Missing permission"
-        }), 403)
-
     req = request.get_json()
     
     scheduled = movie_is_scheduled(req["date"], req["movie"])

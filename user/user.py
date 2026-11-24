@@ -5,7 +5,7 @@ from werkzeug.security import check_password_hash
 from datetime import timedelta
 import os
 
-from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required, get_jwt
 
 app = Flask(__name__)
 
@@ -29,9 +29,11 @@ def write(users):
         full['users']=users
         json.dump(full, f)
 
-def check_admin():
+def check_permission(userid):
+    current_user = get_jwt_identity()
     claims = get_jwt()
-    return claims.get("admin", False)
+
+    return current_user == userid or claims.get("admin", False)
 
 @app.route("/", methods=['GET'])
 def home():
@@ -101,7 +103,7 @@ def get_user_byusername(): # pas très Rest rules car parametre caché dans la r
 @app.route("/users/<userid>/<newusername>", methods=['PUT'])
 @jwt_required()
 def update_user_username(userid, newusername):
-    if not check_admin():
+    if not check_permission(userid):
         return make_response(jsonify({
             "error": "Admin permission required"
         }), 403)
@@ -120,7 +122,7 @@ def update_user_username(userid, newusername):
 @app.route("/users/<userid>", methods=['DELETE'])
 @jwt_required()
 def del_user(userid):
-    if not check_admin():
+    if not check_permission(userid):
         return make_response(jsonify({
             "error": "Admin permission required"
         }), 403)
@@ -136,13 +138,7 @@ def del_user(userid):
 
 # ajout d'un user
 @app.route("/users/<userid>", methods=['POST'])
-@jwt_required()
 def add_user(userid):
-    if not check_admin():
-        return make_response(jsonify({
-            "error": "Admin permission required"
-        }), 403)
-
     req = request.get_json()
 
     for user in users:
