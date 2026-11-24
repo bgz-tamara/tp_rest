@@ -5,6 +5,12 @@ from werkzeug.exceptions import NotFound
 
 app = Flask(__name__)
 
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-change-this"
+)
+
+jwt = JWTManager(app)
+
 PORT = 3202
 HOST = '0.0.0.0'
 MOVIE_URL = "http://localhost:3200"
