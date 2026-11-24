@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, make_response
 import json
 import requests
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+import os
 
 app = Flask(__name__)
 
