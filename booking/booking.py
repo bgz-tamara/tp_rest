@@ -2,8 +2,16 @@ from flask import Flask, render_template, request, jsonify, make_response
 import requests
 import json
 from werkzeug.exceptions import NotFound
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt, get_jwt_identity
+import os
 
 app = Flask(__name__)
+
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-change-this"
+)
+
+jwt = JWTManager(app)
 
 PORT = 3201
 HOST = '0.0.0.0'
@@ -19,6 +27,12 @@ def write(bookings):
         full = {}
         full['bookings']=bookings
         json.dump(full, f)
+
+def check_permission(userid):
+    current_user = get_jwt_identity()
+    claims = get_jwt()
+
+    return current_user == userid or claims.get("admin", False)
 
 def movie_is_scheduled(date, movieid) :
    try:
@@ -47,7 +61,13 @@ def get_json():
     return res
 
 @app.route("/bookings/<userid>", methods=['GET'])
+@jwt_required()
 def get_all_booking_of_userid(userid):
+    if not check_permission(userid):
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+        
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             res = []                                  
@@ -60,7 +80,13 @@ def get_all_booking_of_userid(userid):
     return make_response(jsonify({"error": "No bookings for this user founded"}), 404)
 
 @app.route("/bookings/<userid>/<date>/<movie>", methods=['GET'])
+@jwt_required()
 def get_booking(userid, date, movie): 
+    if not check_permission(userid):
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             detail_movie = []          
@@ -73,7 +99,13 @@ def get_booking(userid, date, movie):
     return make_response(jsonify({"error":"Booking not found"}),404) 
 
 @app.route("/bookings/<userid>/<date>/<movieid>", methods=['DELETE'])
+@jwt_required()
 def del_booking(userid,date,movieid):
+    if not check_permission(userid):
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
+
     for booking in bookings:
         if str(booking["userid"]) == str(userid):
             for dates in booking["dates"]: 
