@@ -12,6 +12,13 @@ app.config["JWT_SECRET_KEY"] = "super-secret"
 
 jwt = JWTManager(app)
 
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    return make_response(jsonify({
+        "error": "You need to log in to access this page"
+    }), 401)
+
+
 PORT = 3200 #choisi comme ca
 HOST = '0.0.0.0' 
 

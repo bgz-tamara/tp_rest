@@ -14,6 +14,12 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=720)
 
 jwt = JWTManager(app)
 
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    return make_response(jsonify({
+        "error": "You need to log in to access this page"
+    }), 401)
+
 PORT = 3203
 HOST = '0.0.0.0'
 
