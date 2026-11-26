@@ -8,9 +8,7 @@ from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 app = Flask(__name__) # "app .run" app = serveur flask => serveur web (capable de recevoir des requetes et d'envoyerdes rep http)
 
-app.config["JWT_SECRET_KEY"] = os.environ.get(
-    "JWT_SECRET_KEY", "dev-secret-change-this"
-)
+app.config["JWT_SECRET_KEY"] = "super-secret"
 
 jwt = JWTManager(app)
 
