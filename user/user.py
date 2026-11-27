@@ -9,13 +9,16 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 
 app = Flask(__name__)
 
-app.config["JWT_SECRET_KEY"] = os.environ.get(
-    "JWT_SECRET_KEY", "dev-secret-change-this"
-)
-
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_SECRET_KEY"] = "super-secret"
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=720)
 
 jwt = JWTManager(app)
+
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    return make_response(jsonify({
+        "error": "You need to log in to access this page"
+    }), 401)
 
 PORT = 3203
 HOST = '0.0.0.0'
