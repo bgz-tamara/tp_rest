@@ -1,199 +1,182 @@
-openapi: 3.1.3
+openapi: 3.1.1
 info:
   title: Movie Service API
-  description: API for browsing, adding, and rating movies.
+  description: Consultation et gestion du catalogue de films.
   version: "1.0.0"
   contact:
-    name: Helene Coullon
-    url: https://helene-coullon.fr/
-    email: helene.coullon@imt-atlantique.fr
+    name: Ludivine Levallois
+    email: ludivine.levallois@imt-atlantique.net
 servers:
   - url: http://localhost:3200
-    description: Local development server
 
-tags: # tags des routes et des perm de chacune
-- name: admin
-  description: Secured Admin-only calls
-- name: user
-  description: Operations available to regular user
+tags:
+  - name: admin
+    description: Routes réservées aux administrateurs (JWT requis)
+  - name: user
+    description: Routes publiques
 
-paths: # routes de l'api
+paths:
   /:
-    get: 
-      tags:
-        - user
-      summary: Service home page
-      description: Returns an HTML welcome message.
-      responses: # reponses renvoyées par la route
+    get:
+      tags: [user]
+      summary: Page d'accueil
+      operationId: home
+      responses:
         "200":
-          description: HTML welcome message
+          description: Message de bienvenue
           content:
             text/html:
-              schema:
-                type: string
-                example: "<h1 style='color:blue'>Welcome to the Movie service!</h1>"
+              schema: { type: string }
 
   /json:
     get:
-      tags:
-        - user
-      summary: Retrieve the full list of movies
-      description: Returns the list of all available movies.
+      tags: [user]
+      summary: Liste tous les films
+      operationId: get_json
       responses:
         "200":
-          description: List of movies
+          description: Liste des films
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: "#/components/schemas/Movie"
+                items: { $ref: "#/components/schemas/Movie" }
 
   /movies/{movieid}:
+    parameters:
+      - $ref: "#/components/parameters/MovieId"
     get:
-      tags:
-        - user
-      summary: Retrieve a movie by its ID
-      parameters:
-        - $ref: "#/components/parameters/MovieId"
+      tags: [user]
+      summary: Récupère un film par son ID
+      operationId: get_movie_byid
+      responses:
+        "200": { $ref: "#/components/responses/Movie" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [admin]
+      summary: Ajoute un film
+      operationId: add_movie
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Movie" }
       responses:
         "200":
-          description: Movie found
+          description: Film ajouté
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Movie"
-        "500":
-          description: Movie ID not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+              schema: { $ref: "#/components/schemas/Message" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [admin]
+      summary: Supprime un film
+      operationId: del_movie
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Movie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
-    post:
-      tags:
-        - admin
-      summary: Add a new movie
-      description: Adds a movie with the given ID, if it doesn't already exist.
+  /moviesbytitle:
+    get:
+      tags: [user]
+      summary: Récupère un film par son titre exact
+      operationId: get_movie_bytitle
       parameters:
-        - $ref: "#/components/parameters/MovieId"
+        - name: title
+          in: query
+          required: true
+          schema: { type: string, example: The Martian }
+      responses:
+        "200": { $ref: "#/components/responses/Movie" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /movies/name_update/{movieid}:
+    parameters:
+      - $ref: "#/components/parameters/MovieId"
+    patch:
+      tags: [admin]
+      summary: Modifie le titre d'un film
+      operationId: update_movie_name
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Movie"
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, example: Creed II }
       responses:
-        "200":
-          description: Movie added successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: movie added
-        "500":
-          description: Movie ID already exists
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /moviesbytitle:
-    get:
-      tags:
-        - user
-      summary: Retrieve a movie by its title
-      parameters:
-        - name: title
-          in: query
-          required: true
-          description: Exact title of the movie to search for
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Movie found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Movie"
-        "500":
-          description: Movie title not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /movies/{movieid}/{rate}:
-    put:
-      tags:
-        - admin
-      summary: Update a movie's rating
-      parameters:
-        - $ref: "#/components/parameters/MovieId"
-        - name: rate
-          in: path
-          required: true
-          description: New rating to assign to the movie
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Movie updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Movie"
-        "500":
-          description: Movie ID not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+        "200": { $ref: "#/components/responses/Movie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenu via POST /login sur le service User (port 3203)
+
   parameters:
     MovieId:
       name: movieid
       in: path
       required: true
-      description: Unique identifier of the movie
-      schema:
-        type: string
+      schema: { type: string, format: uuid }
 
   schemas:
     Movie:
       type: object
-      description: Representation of a movie.
+      required: [id, title, rating, director]
       properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier of the movie
-          example: "720d006c-3a57-4b6a-b18f-9b713b073f3c"
-        title:
-          type: string
-          description: Movie title
-          example: "The Good Dinosaur"
-        rating:
-          type: number
-          format: float
-          description: Rating assigned to the movie
-          example: 7.4
-        director:
-          type: string
-          description: Movie director
-          example: "Peter Sohn"
-      required:
-        - id
-        - title
-
+        id: { type: string, format: uuid, example: 267eedb8-0f5d-42d5-8f43-72426b9fb3e6 }
+        title: { type: string, example: Creed }
+        rating: { type: number, example: 8.8 }
+        director: { type: string, example: Ryan Coogler }
+    Message:
+      type: object
+      properties:
+        message: { type: string }
     Error:
       type: object
       properties:
-        error:
-          type: string
-          example: "Movie ID not found"
+        error: { type: string }
+
+  responses:
+    Movie:
+      description: Le film concerné
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Movie" }
+    Unauthorized:
+      description: Token absent ou expiré
+    InvalidToken:
+      description: Token invalide
+    Forbidden:
+      description: Droits administrateur requis
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Film introuvable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: Film introuvable, ou ID déjà existant (ajout)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

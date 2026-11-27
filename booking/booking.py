@@ -123,8 +123,14 @@ def del_booking(userid,date,movieid):
     return res
 
 @app.route("/bookings/create", methods=['POST'])
+@jwt_required()
 def add_booking():
     req = request.get_json()
+    
+    if not check_permission(req["userid"]):
+        return make_response(jsonify({
+            "error": "Missing permission"
+        }), 403)
     
     scheduled = movie_is_scheduled(req["date"], req["movie"])
     if scheduled is None:

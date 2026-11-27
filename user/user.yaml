@@ -1,0 +1,212 @@
+openapi: 3.1.1
+info:
+  title: User Service API
+  description: Authentification et gestion des utilisateurs.
+  version: "1.0.0"
+  contact:
+    name: Ludivine Levallois
+    email: ludivine.levallois@imt-atlantique.net
+servers:
+  - url: http://localhost:3203
+
+tags:
+  - name: user
+    description: Routes publiques
+  - name: owner
+    description: Routes réservées à l'utilisateur concerné ou à un administrateur (JWT requis)
+
+paths:
+  /:
+    get:
+      tags: [user]
+      summary: Page d'accueil
+      operationId: home
+      responses:
+        "200":
+          description: Message de bienvenue
+          content:
+            text/html:
+              schema: { type: string }
+
+  /json:
+    get:
+      tags: [user]
+      summary: Liste tous les utilisateurs
+      operationId: get_json
+      responses:
+        "200":
+          description: Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+
+  /login:
+    post:
+      tags: [user]
+      summary: Connexion, renvoie un token JWT valable 1 h
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, password]
+              properties:
+                id: { type: string, example: chris_rivers }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Login successful }
+                  access_token: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/BadCredentials" }
+
+  /users/{userid}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [user]
+      summary: Récupère un utilisateur par son ID
+      operationId: get_user_byid
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [user]
+      summary: Ajoute un utilisateur
+      operationId: add_user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/User" }
+      responses:
+        "200":
+          description: Utilisateur ajouté
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [owner]
+      summary: Supprime un utilisateur
+      operationId: del_user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /usersbyusername:
+    get:
+      tags: [user]
+      summary: Récupère un utilisateur par son nom exact
+      operationId: get_user_byusername
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema: { type: string, example: Chris Rivers }
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /users/{userid}/{newusername}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+      - name: newusername
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      tags: [owner]
+      summary: Modifie le nom d'un utilisateur
+      operationId: update_user_username
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenu via POST /login
+
+  parameters:
+    UserId:
+      name: userid
+      in: path
+      required: true
+      schema: { type: string, example: chris_rivers }
+
+  schemas:
+    User:
+      type: object
+      required: [id, name, password_hash, admin]
+      properties:
+        id: { type: string, example: chris_rivers }
+        name: { type: string, example: Chris Rivers }
+        password_hash: { type: string, description: Hash du mot de passe (werkzeug) }
+        last_active: { type: integer, example: 1360031010 }
+        admin: { type: boolean, example: false }
+    Message:
+      type: object
+      properties:
+        message: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    User:
+      description: L'utilisateur concerné
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/User" }
+    BadRequest:
+      description: Corps JSON manquant ou vide
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadCredentials:
+      description: Identifiants invalides
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Token absent ou expiré
+    InvalidToken:
+      description: Token invalide
+    Forbidden:
+      description: Permission insuffisante
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Utilisateur introuvable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: Utilisateur introuvable, ou ID déjà existant (ajout)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

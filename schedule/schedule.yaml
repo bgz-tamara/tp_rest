@@ -1,0 +1,207 @@
+openapi: 3.1.1
+info:
+  title: Schedule Service API
+  description: >
+    Programmation des films par date. Appelle le service Movie pour vérifier
+    et détailler les films.
+  version: "1.0.0"
+  contact:
+    name: Tamara Benghezal
+    email: tamara.benghezal@imt-atlantique.net
+servers:
+  - url: http://localhost:3202
+
+
+tags:
+  - name: admin
+    description: Routes réservées aux administrateurs (JWT requis)
+  - name: user
+    description: Routes publiques
+
+paths:
+  /:
+    get:
+      tags: [user]
+      summary: Page d'accueil
+      operationId: home
+      responses:
+        "200":
+          description: Message de bienvenue
+          content:
+            text/html:
+              schema: { type: string }
+
+  /json:
+    get:
+      tags: [user]
+      summary: Liste toute la programmation
+      operationId: get_json
+      responses:
+        "200":
+          description: Programmation complète
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Schedule" }
+
+  /schedules/{movieid}:
+    parameters:
+      - $ref: "#/components/parameters/MovieId"
+    get:
+      tags: [user]
+      summary: Dates de programmation d'un film
+      operationId: get_schedules_by_movie
+      responses:
+        "200":
+          description: Dates trouvées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  movie: { type: string, format: uuid }
+                  dates:
+                    type: array
+                    items: { $ref: "#/components/schemas/Date" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /schedules/{date}/{movieid}:
+    parameters:
+      - $ref: "#/components/parameters/Date"
+      - $ref: "#/components/parameters/MovieId"
+    get:
+      tags: [user]
+      summary: Vérifie qu'un film est programmé à une date
+      operationId: get_schedule_by_date_and_movie
+      responses:
+        "200":
+          description: Film programmé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { $ref: "#/components/schemas/Date" }
+                  movie:
+                    type: array
+                    items: { $ref: "#/components/schemas/MovieDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      summary: Retire un film de la programmation
+      operationId: del_schedule
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Programmation de la date après suppression
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /schedules/create:
+    post:
+      tags: [admin]
+      summary: Programme un film à une date
+      operationId: add_schedule
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, movie]
+              properties:
+                date: { $ref: "#/components/schemas/Date" }
+                movie: { type: string, format: uuid, example: 267eedb8-0f5d-42d5-8f43-72426b9fb3e6 }
+      responses:
+        "200":
+          description: Programmation ajoutée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Schedule added }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "503":
+          description: Service Movie indisponible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenu via POST /login sur le service User (port 3203)
+
+  parameters:
+    Date:
+      name: date
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Date" }
+    MovieId:
+      name: movieid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    Date:
+      type: string
+      description: Format AAAAMMJJ
+      example: "20151201"
+    Schedule:
+      type: object
+      properties:
+        date: { $ref: "#/components/schemas/Date" }
+        movies:
+          type: array
+          items: { type: string, format: uuid }
+    MovieDetail:
+      type: object
+      description: Film complet, ou seulement son id si le service Movie ne le trouve pas
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        rating: { type: number }
+        director: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Token absent ou expiré
+    InvalidToken:
+      description: Token invalide
+    Forbidden:
+      description: Droits administrateur requis
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Film ou programmation introuvable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: Programmation introuvable (suppression) ou déjà existante (ajout)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

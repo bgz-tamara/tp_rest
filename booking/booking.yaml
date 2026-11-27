@@ -1,0 +1,224 @@
+openapi: 3.1.1
+info:
+  title: Booking Service API
+  description: >
+    Gestion des réservations. Appelle le service Movie (détails des films)
+    et le service Schedule (vérification de la programmation).
+  version: "1.0.0"
+  contact:
+    name: Tamara Benghezal
+    email: tamara.benghezal@imt-atlantique.net
+servers:
+  - url: http://localhost:3201
+
+tags:
+  - name: user
+    description: Routes publiques
+  - name: owner
+    description: Routes réservées à l'utilisateur concerné ou à un administrateur (JWT requis)
+
+paths:
+  /:
+    get:
+      tags: [user]
+      summary: Page d'accueil
+      operationId: home
+      responses:
+        "200":
+          description: Message de bienvenue
+          content:
+            text/html:
+              schema: { type: string }
+
+  /json:
+    get:
+      tags: [user]
+      summary: Liste toutes les réservations
+      operationId: get_json
+      responses:
+        "200":
+          description: Liste des réservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Booking" }
+
+  /bookings/{userid}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [owner]
+      summary: Réservations d'un utilisateur, avec le détail des films
+      operationId: get_all_booking_of_userid
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Réservations groupées par date
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date: { $ref: "#/components/schemas/Date" }
+                    movies:
+                      type: array
+                      items: { $ref: "#/components/schemas/MovieDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+
+  /bookings/{userid}/{date}/{movieid}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+      - $ref: "#/components/parameters/Date"
+      - $ref: "#/components/parameters/MovieId"
+    get:
+      tags: [owner]
+      summary: Consulte une réservation
+      operationId: get_booking
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Détail de la réservation (liste vide si le film n'est pas réservé à cette date)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { $ref: "#/components/schemas/Date" }
+                  movie:
+                    type: array
+                    items: { $ref: "#/components/schemas/MovieDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+    delete:
+      tags: [owner]
+      summary: Annule une réservation
+      operationId: del_booking
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Réservations de l'utilisateur après suppression
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidToken" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /bookings/create:
+    post:
+      tags: [user]
+      summary: Crée une réservation
+      operationId: add_booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userid, date, movie]
+              properties:
+                userid: { type: string, example: chris_rivers }
+                date: { $ref: "#/components/schemas/Date" }
+                movie: { type: string, format: uuid, example: 267eedb8-0f5d-42d5-8f43-72426b9fb3e6 }
+      responses:
+        "200":
+          description: Réservation ajoutée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Booking added }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "503":
+          description: Service Schedule indisponible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenu via POST /login sur le service User (port 3203)
+
+  parameters:
+    UserId:
+      name: userid
+      in: path
+      required: true
+      schema: { type: string, example: chris_rivers }
+    Date:
+      name: date
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Date" }
+    MovieId:
+      name: movieid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    Date:
+      type: string
+      description: Format AAAAMMJJ
+      example: "20151201"
+    Booking:
+      type: object
+      properties:
+        userid: { type: string, example: chris_rivers }
+        dates:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { $ref: "#/components/schemas/Date" }
+              movies:
+                type: array
+                items: { type: string, format: uuid }
+    MovieDetail:
+      type: object
+      description: Film complet, ou seulement son id si le service Movie ne le trouve pas
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        rating: { type: number }
+        director: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Token absent ou expiré
+    InvalidToken:
+      description: Token invalide
+    Forbidden:
+      description: Permission insuffisante
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Réservation introuvable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: Réservation introuvable ou déjà existante, ou film non programmé
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
